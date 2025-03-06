@@ -3,7 +3,8 @@ import matplotlib.pyplot as plt
 import tensorflow as tf
 mnist = tf.keras.datasets.mnist
 import argparse
-
+import wandb
+from wandb_trainer import WandbTrainer
 # Import our modules
 from model import NeuralNetwork
 from trainer import Trainer
@@ -18,7 +19,27 @@ def main():
     parser.add_argument('--batch_size', type=int, default=256, help='Batch size for training')
     parser.add_argument('--learning_rate', type=float, default=0.01, help='Learning rate')
     parser.add_argument('--optimizer', type=str, default='sgd', help='Optimizer to use (sgd)')
+    parser.add_argument('--wandb_project', type=str, default='mnist-nn', help='WandB project name')
+    parser.add_argument('--wandb_entity', type=str, default=None, help='WandB entity name')
+    parser.add_argument('--wandb_run_name', type=str, default=None, help='WandB run name')
     args = parser.parse_args()
+    
+    # Initialize wandb
+    config = {
+        "hidden_dim": args.hidden_dim,
+        "learning_rate": args.learning_rate,
+        "epochs": args.epochs,
+        "batch_size": args.batch_size,
+        "optimizer": args.optimizer,
+        "architecture": "simple_nn"
+    }
+    
+    wandb.init(
+        project=args.wandb_project,
+        entity=args.wandb_entity,
+        name=args.wandb_run_name,
+        config=config
+    )
     
     # Load MNIST dataset
     (x_train, y_train), (x_test, y_test) = mnist.load_data()
@@ -31,7 +52,8 @@ def main():
     # Plot sample images
     class_names = [str(i) for i in range(10)]
     sample_img_fig = plot_sample_images(x_test, y_test, class_names)
-    plt.show()
+    wandb.log({"sample_images": sample_img_fig})
+    plt.close(sample_img_fig)
     
     # Define network architecture
     input_dim = X_train.shape[0]  # 784
@@ -51,8 +73,8 @@ def main():
     # Get optimizer
     optimizer = get_optimizer(args.optimizer, args.learning_rate)
     
-    # Create trainer
-    trainer = Trainer(model, optimizer)
+    # Create trainer with wandb callback
+    trainer = WandbTrainer(model, optimizer)
     
     # Train the model
     print(f"Training with: hidden_dim={args.hidden_dim}, epochs={args.epochs}, "
@@ -68,16 +90,22 @@ def main():
     
     # Plot training history
     history_fig = trainer.plot_training_history()
-    plt.show()
+    wandb.log({"training_history": history_fig})
+    plt.close(history_fig)
     
     # Make predictions on test set
     test_predictions = model.predict(X_test)
     test_accuracy = np.mean(test_predictions == y_test) * 100
     print(f"Test accuracy: {test_accuracy:.2f}%")
+    wandb.log({"test_accuracy": test_accuracy})
     
     # Plot confusion matrix
     cm_fig = plot_confusion_matrix(y_test, test_predictions, class_names)
-    plt.show()
+    wandb.log({"confusion_matrix": cm_fig})
+    plt.close(cm_fig)
+    
+    # Finish the wandb run
+    wandb.finish()
 
 if __name__ == "__main__":
     main()
