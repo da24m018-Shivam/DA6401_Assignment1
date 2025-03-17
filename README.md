@@ -122,14 +122,6 @@ Compare cross-entropy and mean squared error loss functions:
 python train.py --loss compare --wandb_entity your_wandb_username --wandb_project your_project_name
 ```
 
-### Recommended MNIST Configurations
-
-Try pre-defined recommended configurations on MNIST:
-
-```bash
-python train.py --dataset mnist --loss mnist_recommendations --wandb_entity your_wandb_username --wandb_project your_project_name
-```
-
 ### Custom Network Architecture
 
 You can specify different sizes for each hidden layer by providing comma-separated values:
