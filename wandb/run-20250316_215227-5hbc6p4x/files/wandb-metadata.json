@@ -1,0 +1,47 @@
+{
+  "os":  "Windows-10-10.0.22631-SP0",
+  "python":  "CPython 3.9.21",
+  "startedAt":  "2025-03-16T16:22:27.319468Z",
+  "args":  [
+    "--wandb_entity",
+    "shivam20102-iiit",
+    "--wandb_project",
+    "DA6401_Assignment1_new40",
+    "--run_sweep",
+    "--sweep_count",
+    "10"
+  ],
+  "program":  "D:\\Sem1\\DL_new\\DL\\train.py",
+  "codePath":  "train.py",
+  "email":  "shivam20102@iiitnr.edu.in",
+  "root":  "D:\\Sem1\\DL_new\\DL",
+  "host":  "LAPTOP-UGBBD3I9",
+  "executable":  "C:\\Users\\user\\anaconda3\\envs\\deeplearning\\python.exe",
+  "codePathLocal":  "train.py",
+  "cpu_count":  8,
+  "cpu_count_logical":  16,
+  "gpu":  "NVIDIA GeForce RTX 4060 Laptop GPU",
+  "gpu_count":  1,
+  "disk":  {
+    "/":  {
+      "total":  "104857595904",
+      "used":  "14646493184"
+    }
+  },
+  "memory":  {
+    "total":  "33556664320"
+  },
+  "cpu":  {
+    "count":  8,
+    "countLogical":  16
+  },
+  "gpu_nvidia":  [
+    {
+      "name":  "NVIDIA GeForce RTX 4060 Laptop GPU",
+      "memoryTotal":  "8585740288",
+      "cudaCores":  3072,
+      "architecture":  "Ada"
+    }
+  ],
+  "cudaVersion":  "12.8"
+}

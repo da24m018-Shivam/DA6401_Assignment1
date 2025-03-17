@@ -1,111 +1,106 @@
-import numpy as np
-import matplotlib.pyplot as plt
-import tensorflow as tf
-mnist = tf.keras.datasets.mnist
-import argparse
+import matplotlib
+matplotlib.use('Agg')  # Use non-interactive backend for Matplotlib
 import wandb
-from wandb_trainer import WandbTrainer
-# Import our modules
-from model import NeuralNetwork
-from trainer import Trainer
-from optimizers import get_optimizer
-from utils import preprocess_data, plot_confusion_matrix, plot_sample_images
+from utils import preprocess_data, create_mini_batches, compute_accuracy, plot_confusion_matrix, plot_sample_images
+from trainer import train_model
+from config import parse_args, define_sweep_config
+from sweeps import sweep_agent
+from experiments import compare_loss_functions
+import json
+import os
 
 def main():
-    # Parse command line arguments
-    parser = argparse.ArgumentParser(description='Train a neural network on MNIST')
-    parser.add_argument('--hidden_dim', type=int, default=128, help='Number of units in hidden layer')
-    parser.add_argument('--epochs', type=int, default=10, help='Number of training epochs')
-    parser.add_argument('--batch_size', type=int, default=256, help='Batch size for training')
-    parser.add_argument('--learning_rate', type=float, default=0.01, help='Learning rate')
-    parser.add_argument('--optimizer', type=str, default='sgd', help='Optimizer to use (sgd)')
-    parser.add_argument('--wandb_project', type=str, default='mnist-nn', help='WandB project name')
-    parser.add_argument('--wandb_entity', type=str, default=None, help='WandB entity name')
-    parser.add_argument('--wandb_run_name', type=str, default=None, help='WandB run name')
-    args = parser.parse_args()
+    args = parse_args()  # Parse command-line arguments
+    print(args)
+    wandb.login()  # Authenticate WandB
+
+    if args.run_sweep:
+        # Run hyperparameter sweep
+        sweep_config = define_sweep_config()
+        sweep_id = wandb.sweep(sweep_config, project=args.wandb_project, entity=args.wandb_entity)
+        
+        # Run sweep agent and wait for completion
+        wandb.agent(sweep_id, function=lambda: sweep_agent(args), count=args.sweep_count)
+        
+        # After sweep is complete, read the best model info
+        with open("sweep_results/best_model_info.json", "r") as f:
+            best_model_info = json.load(f)
+        
+        # Print the information to console
+        print(f"\nBest model from sweep:")
+        print(f"Run ID: {best_model_info['run_id']}")
+        print(f"Sweep ID: {best_model_info.get('sweep_id', 'N/A')}")
+        print(f"Test Accuracy: {best_model_info['test_accuracy']:.2f}%")
+        print(f"Dataset: {best_model_info.get('dataset', 'N/A')}")
+        print(f"Configuration: {best_model_info['config']}")
+        
+        # Only create summary run if dataset is fashion_mnist
+        if best_model_info.get('dataset') == 'fashion_mnist':
+            # Create a summary run to log artifacts
+            with wandb.init(project=args.wandb_project, entity=args.wandb_entity) as run:
+                
+                # Log the best model configuration as an artifact
+                config_artifact = wandb.Artifact(
+                    name=f"best-model-config-{sweep_id[:8]}",
+                    type="model-info",
+                    description=f"Best model configuration from sweep {sweep_id}"
+                )
+                
+                # Add the best model info JSON file to the artifact
+                config_artifact.add_file("sweep_results/best_model_info.json")
+                
+                # Add the confusion matrix image to the artifact
+                config_artifact.add_file("sweep_results/best_model_confusion_matrix.png")
+                
+                # Log the artifact
+                run.log_artifact(config_artifact)
+                
+                # Also log the confusion matrix as media for easy viewing
+                confusion_matrix_img = wandb.Image(
+                    "sweep_results/best_model_confusion_matrix.png", 
+                    caption=f"Confusion Matrix for Best Model (Acc: {best_model_info['test_accuracy']:.2f}%)"
+                )
+                run.log({"best_model_confusion_matrix": confusion_matrix_img})
+                
+                # Log the best model parameters as an artifact
+                params_artifact = wandb.Artifact(
+                    name=f"best-model-params-{sweep_id[:8]}",
+                    type="model-weights",
+                    description=f"Best model parameters from sweep {sweep_id}"
+                )
+                
+                # Add the model parameters file to the artifact
+                params_artifact.add_file("sweep_results/best_model_params.npy")
+                
+                # Log the artifact
+                run.log_artifact(params_artifact)
+                
+                # Log the sweep info and best model metrics
+                run.log({
+                    "best_test_accuracy": best_model_info['test_accuracy'],
+                    "best_run_id": best_model_info['run_id'],
+                    "sweep_id": sweep_id,
+                    "total_runs": args.sweep_count,
+                    "dataset": best_model_info.get('dataset', 'N/A')
+                })
+                
+                # Add a link to the best run
+                best_run_link = f"{run.get_project_url()}/runs/{best_model_info['run_id']}"
+                run.notes = f"Best run: [{best_model_info['run_id']}]({best_run_link}) with accuracy {best_model_info['test_accuracy']:.2f}% on {best_model_info.get('dataset', 'N/A')}"
+                
+                print(f"Artifacts and results uploaded to WandB project: {args.wandb_project}")
+                print(f"Summary run: {run.name} (ID: {run.id})")
+        else:
+            print(f"Model artifacts not saved - dataset is {best_model_info.get('dataset', 'N/A')}, not fashion_mnist")
     
-    # Initialize wandb
-    config = {
-        "hidden_dim": args.hidden_dim,
-        "learning_rate": args.learning_rate,
-        "epochs": args.epochs,
-        "batch_size": args.batch_size,
-        "optimizer": args.optimizer,
-        "architecture": "simple_nn"
-    }
+    elif args.loss == 'compare':
+        # Compare different loss functions
+        compare_loss_functions(args)
     
-    wandb.init(
-        project=args.wandb_project,
-        entity=args.wandb_entity,
-        name=args.wandb_run_name,
-        config=config
-    )
-    
-    # Load MNIST dataset
-    (x_train, y_train), (x_test, y_test) = mnist.load_data()
-    
-    # Preprocess data
-    X_train, Y_train, X_test, Y_test, y_train, y_test = preprocess_data(
-        x_train[:10000], y_train[:10000], x_test[:1000], y_test[:1000]
-    )
-    
-    # Plot sample images
-    class_names = [str(i) for i in range(10)]
-    sample_img_fig = plot_sample_images(x_test, y_test, class_names)
-    wandb.log({"sample_images": sample_img_fig})
-    plt.close(sample_img_fig)
-    
-    # Define network architecture
-    input_dim = X_train.shape[0]  # 784
-    hidden_dim = args.hidden_dim  # Hidden layer size
-    output_dim = 10  # Number of classes
-    
-    layer_dims = [input_dim, hidden_dim, output_dim]
-    activations = ['relu', 'sigmoid']  # ReLU for hidden, sigmoid for output
-    
-    # Create neural network
-    model = NeuralNetwork(
-        layer_dims=layer_dims,
-        activations=activations,
-        learning_rate=args.learning_rate
-    )
-    
-    # Get optimizer
-    optimizer = get_optimizer(args.optimizer, args.learning_rate)
-    
-    # Create trainer with wandb callback
-    trainer = WandbTrainer(model, optimizer)
-    
-    # Train the model
-    print(f"Training with: hidden_dim={args.hidden_dim}, epochs={args.epochs}, "
-          f"batch_size={args.batch_size}, learning_rate={args.learning_rate}, "
-          f"optimizer={args.optimizer}")
-    
-    trainer.train(
-        X_train, Y_train, X_test, Y_test, y_train, y_test,
-        num_epochs=args.epochs,
-        batch_size=args.batch_size,
-        print_every=1
-    )
-    
-    # Plot training history
-    history_fig = trainer.plot_training_history()
-    wandb.log({"training_history": history_fig})
-    plt.close(history_fig)
-    
-    # Make predictions on test set
-    test_predictions = model.predict(X_test)
-    test_accuracy = np.mean(test_predictions == y_test) * 100
-    print(f"Test accuracy: {test_accuracy:.2f}%")
-    wandb.log({"test_accuracy": test_accuracy})
-    
-    # Plot confusion matrix
-    cm_fig = plot_confusion_matrix(y_test, test_predictions, class_names)
-    wandb.log({"confusion_matrix": cm_fig})
-    plt.close(cm_fig)
-    
-    # Finish the wandb run
-    wandb.finish()
+    else:
+        # Standard training process
+        train_model(args, dataset_type=args.dataset)
+
 
 if __name__ == "__main__":
     main()

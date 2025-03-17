@@ -1,0 +1,21 @@
+{
+  "os":  "Windows-10-10.0.22631-SP0",
+  "python":  "CPython 3.9.21",
+  "startedAt":  "2025-03-16T14:33:15.321577Z",
+  "args":  [
+    "--wandb_entity",
+    "shivam20102-iiit",
+    "--wandb_project",
+    "DA6401_Assignment1_new24",
+    "--run_sweep",
+    "--sweep_count",
+    "20"
+  ],
+  "program":  "D:\\Sem1\\DL_new\\DL\\train.py",
+  "codePath":  "train.py",
+  "email":  "shivam20102@iiitnr.edu.in",
+  "root":  "D:\\Sem1\\DL_new\\DL",
+  "host":  "LAPTOP-UGBBD3I9",
+  "executable":  "C:\\Users\\user\\anaconda3\\envs\\deeplearning\\python.exe",
+  "codePathLocal":  "train.py"
+}

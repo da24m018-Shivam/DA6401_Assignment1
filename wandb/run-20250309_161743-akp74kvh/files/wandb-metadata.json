@@ -1,0 +1,34 @@
+{
+  "os":  "Windows-10-10.0.26100-SP0",
+  "python":  "CPython 3.10.10",
+  "startedAt":  "2025-03-09T10:47:43.777747Z",
+  "args":  [
+    "--wandb_entity",
+    "da24m008-iit-madras",
+    "--wandb_project",
+    "mlops",
+    "--run_sweep"
+  ],
+  "program":  "E:\\IITM\\Shivam\\DL\\train.py",
+  "codePath":  "train.py",
+  "email":  "da24m008@smail.iitm.ac.in",
+  "root":  "E:\\IITM\\Shivam\\DL",
+  "host":  "DESKTOP-CMJF4BA",
+  "executable":  "C:\\Users\\Hobhav Fulzele\\AppData\\Local\\Programs\\Python\\Python310\\python.exe",
+  "codePathLocal":  "train.py",
+  "cpu_count":  10,
+  "cpu_count_logical":  12,
+  "disk":  {
+    "/":  {
+      "total":  "1000202039296",
+      "used":  "388458065920"
+    }
+  },
+  "memory":  {
+    "total":  "16849293312"
+  },
+  "cpu":  {
+    "count":  10,
+    "countLogical":  12
+  }
+}

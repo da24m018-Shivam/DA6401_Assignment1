@@ -1,110 +1,195 @@
 import numpy as np
-from activation import sigmoid, relu, tanh, identity
-from activation import sigmoid_backward, relu_backward, tanh_backward, identity_backward
+from activation import get_activation, get_activation_backward, softmax
 
 class NeuralNetwork:
-    def __init__(self, layer_dims, activations, learning_rate=0.01):
-        self.layer_dims = layer_dims
-        self.L = len(layer_dims) - 1  # number of layers
-        self.activations = activations
-        self.learning_rate = learning_rate
+    def __init__(self, input_size, hidden_layers, output_size, activation='relu', weight_init='xavier'):
+        """
+        Initialize a neural network with configurable architecture.
+        
+        Args:
+            input_size (int): Size of the input layer
+            hidden_layers (list): List of integers specifying the size of each hidden layer
+            output_size (int): Size of the output layer
+            activation (str): Activation function to use ('relu', 'sigmoid', 'tanh', 'identity')
+            weight_init (str): Weight initialization method ('xavier', 'random')
+        """
+        self.input_size = input_size
+        self.hidden_layers = hidden_layers
+        self.output_size = output_size
+        self.activation = activation
+        self.weight_init = weight_init
+        
+        # Get activation functions
+        self._activation_forward = get_activation(activation)
+        self._activation_backward = get_activation_backward(activation)
+        
+        # Initialize parameters
         self.parameters = {}
-        self.cache = {}
-        self.initialize_parameters()
+        self.gradients = {}
+        self.layer_inputs = {}
+        self.layer_outputs = {}
         
-    def initialize_parameters(self):
-        """
-        Initialize parameters for the neural network
-        """
-        np.random.seed(42)  # for reproducibility
+        # Build network architecture
+        layer_sizes = [input_size] + hidden_layers + [output_size]
         
-        for l in range(1, self.L + 1):
-            self.parameters[f'W{l}'] = np.random.randn(self.layer_dims[l], self.layer_dims[l-1]) * 0.01
-            self.parameters[f'b{l}'] = np.zeros((self.layer_dims[l], 1))
-    
-    def forward_propagation(self, X):
-        
-        A = X
-        self.cache['A0'] = X
-        
-        # Implement forward propagation for each layer
-        for l in range(1, self.L + 1):
-            A_prev = A
-            W = self.parameters[f'W{l}']
-            b = self.parameters[f'b{l}']
-            
-            # Preactivation
-            Z = np.dot(W, A_prev) + b
-            self.cache[f'Z{l}'] = Z
-            
-            # Activation
-            if self.activations[l-1] == 'sigmoid':
-                A = sigmoid(Z)
-            elif self.activations[l-1] == 'relu':
-                A = relu(Z)
-            elif self.activations[l-1] == 'tanh':
-                A = tanh(Z)
-            elif self.activations[l-1] == 'identity':
-                A = identity(Z)
+        for i in range(1, len(layer_sizes)):
+            # Weight initialization methods
+            if weight_init.lower() == 'xavier':
+                # Xavier/Glorot initialization for sigmoid/tanh
+                scale = np.sqrt(2.0 / (layer_sizes[i-1] + layer_sizes[i]))
+                self.parameters[f'W{i}'] = np.random.randn(layer_sizes[i], layer_sizes[i-1]) * scale
             else:
-                raise ValueError(f"Unsupported activation: {self.activations[l-1]}")
-            
-            self.cache[f'A{l}'] = A
+                # Standard random initialization
+                self.parameters[f'W{i}'] = np.random.randn(layer_sizes[i], layer_sizes[i-1]) * 0.01
+                
+            # Bias initialization
+            self.parameters[f'b{i}'] = np.zeros((layer_sizes[i], 1))
+    
+    def forward(self, X):
+        """
+        Forward pass through the network
+        
+        Args:
+            X (np.ndarray): Input data of shape (input_size, batch_size)
+        
+        Returns:
+            np.ndarray: Output predictions
+        """
+        # Store input
+        self.layer_inputs['A0'] = X
+        
+        num_layers = len(self.hidden_layers) + 1
+        
+        # Forward through hidden layers
+        for i in range(1, num_layers):
+            Z = np.dot(self.parameters[f'W{i}'], self.layer_inputs[f'A{i-1}']) + self.parameters[f'b{i}']
+            self.layer_inputs[f'Z{i}'] = Z
+            self.layer_inputs[f'A{i}'] = self._activation_forward(Z)
+        
+        # Output layer with softmax activation
+        Z = np.dot(self.parameters[f'W{num_layers}'], self.layer_inputs[f'A{num_layers-1}']) + self.parameters[f'b{num_layers}']
+        self.layer_inputs[f'Z{num_layers}'] = Z
+        A = softmax(Z)
+        self.layer_inputs[f'A{num_layers}'] = A
         
         return A
     
-    def compute_cost(self, AL, Y):
+    def compute_loss(self, Y_pred, Y_true, loss='cross_entropy', weight_decay=0):
+        """
+        Compute loss between predictions and ground truth
         
-        m = Y.shape[1]
+        Args:
+            Y_pred (np.ndarray): Predictions from the network
+            Y_true (np.ndarray): Ground truth labels
+            loss (str): Type of loss function ('cross_entropy', 'mean_squared_error')
+            weight_decay (float): L2 regularization parameter
+            
+        Returns:
+            float: Computed loss value
+        """
+        m = Y_true.shape[1]
         
-        # Compute loss from AL and Y
-        logprobs = np.multiply(np.log(AL + 1e-8), Y) + np.multiply(np.log(1 - AL + 1e-8), 1 - Y)
-        cost = -np.sum(logprobs) / m
+        # Compute the main loss based on specified type
+        if loss == 'cross_entropy':
+            # Add small epsilon to avoid log(0)
+            epsilon = 1e-15
+            loss = -np.sum(Y_true * np.log(Y_pred + epsilon)) / m
+        elif loss == 'squared_error' or loss == 'mean_squared_error':
+            loss = np.sum(np.square(Y_pred - Y_true)) / (2 * m)
+        else:
+            raise ValueError(f"Unsupported loss function: {loss}")
         
-        return cost
+        # Add L2 regularization if weight_decay > 0
+        if weight_decay > 0:
+            l2_reg = 0
+            for i in range(1, len(self.hidden_layers) + 2):
+                l2_reg += np.sum(np.square(self.parameters[f'W{i}']))
+            loss += (weight_decay / (2 * m)) * l2_reg
+            
+        return loss
     
-    def backward_propagation(self, Y):
-        m = Y.shape[1]
-        grads = {}
+    def backward(self, Y_pred, Y_true, loss='cross_entropy', weight_decay=0):
+        """
+        Backpropagation to compute gradients
         
-        # Initialize backpropagation
-        dAL = - (np.divide(Y, self.cache[f'A{self.L}'] + 1e-8) - np.divide(1 - Y, 1 - self.cache[f'A{self.L}'] + 1e-8))
+        Args:
+            Y_pred (np.ndarray): Predictions from the network
+            Y_true (np.ndarray): Ground truth labels
+            loss (str): Type of loss function ('cross_entropy', 'mean_squared_error')
+            weight_decay (float): L2 regularization parameter
+            
+        Returns:
+            dict: Gradients for all parameters
+        """
+        m = Y_true.shape[1]
+        num_layers = len(self.hidden_layers) + 1
         
-        # Backward propagation for each layer
-        dA_prev = dAL
-        for l in reversed(range(1, self.L + 1)):
-            dA = dA_prev
-            Z = self.cache[f'Z{l}']
-            A_prev = self.cache[f'A{l-1}']
-            W = self.parameters[f'W{l}']
-            
-            # Compute gradients
-            if self.activations[l-1] == 'sigmoid':
-                dZ = sigmoid_backward(dA, Z)
-            elif self.activations[l-1] == 'relu':
-                dZ = relu_backward(dA, Z)
-            elif self.activations[l-1] == 'tanh':
-                dZ = tanh_backward(dA, Z)
-            elif self.activations[l-1] == 'identity':
-                dZ = identity_backward(dA, Z)
-            else:
-                raise ValueError(f"Unsupported activation: {self.activations[l-1]}")
-            
-            dW = np.dot(dZ, A_prev.T) / m
-            db = np.sum(dZ, axis=1, keepdims=True) / m
-            dA_prev = np.dot(W.T, dZ)
-            
-            grads[f'dW{l}'] = dW
-            grads[f'db{l}'] = db
+        # Initialize gradients
+        self.gradients = {}
         
-        return grads
-    
-    def update_parameters(self, grads):
-        for l in range(1, self.L + 1):
-            self.parameters[f'W{l}'] -= self.learning_rate * grads[f'dW{l}']
-            self.parameters[f'b{l}'] -= self.learning_rate * grads[f'db{l}']
+        # Compute initial gradient for output layer based on loss type
+        if loss == 'cross_entropy':
+            dZ = Y_pred - Y_true
+        elif loss == 'squared_error' or loss == 'mean_squared_error':
+            dA = Y_pred - Y_true
+            # For the output layer with softmax, need to compute proper gradient
+            # Here simplified as linear for MSE - this is a simplification
+            dZ = dA
+        else:
+            raise ValueError(f"Unsupported loss function: {loss}")
+        
+        # Backpropagation for output layer
+        self.gradients[f'dW{num_layers}'] = np.dot(dZ, self.layer_inputs[f'A{num_layers-1}'].T) / m
+        self.gradients[f'db{num_layers}'] = np.sum(dZ, axis=1, keepdims=True) / m
+        
+        # Add L2 regularization if weight_decay > 0
+        if weight_decay > 0:
+            self.gradients[f'dW{num_layers}'] += (weight_decay / m) * self.parameters[f'W{num_layers}']
+        
+        # Backpropagation for hidden layers
+        for i in range(num_layers - 1, 0, -1):
+            dA = np.dot(self.parameters[f'W{i+1}'].T, dZ)
+            dZ = self._activation_backward(dA, self.layer_inputs[f'Z{i}'])
+            
+            self.gradients[f'dW{i}'] = np.dot(dZ, self.layer_inputs[f'A{i-1}'].T) / m
+            self.gradients[f'db{i}'] = np.sum(dZ, axis=1, keepdims=True) / m
+            
+            # Add L2 regularization if weight_decay > 0
+            if weight_decay > 0:
+                self.gradients[f'dW{i}'] += (weight_decay / m) * self.parameters[f'W{i}']
+        
+        return self.gradients
     
     def predict(self, X):
-        AL = self.forward_propagation(X)
-        predictions = np.argmax(AL, axis=0)
-        return predictions
+        """
+        Predict class labels for samples in X
+        
+        Args:
+            X (np.ndarray): Input data
+            
+        Returns:
+            np.ndarray: Predicted class indices
+        """
+        A = self.forward(X)
+        return np.argmax(A, axis=0)
+    
+    def get_config(self):
+        """Returns the configuration of the model"""
+        return {
+            "input_size": self.input_size,
+            "hidden_layers": self.hidden_layers,
+            "output_size": self.output_size,
+            "activation": self.activation,
+            "weight_init": self.weight_init
+        }
+    
+    @classmethod
+    def from_config(cls, config):
+        """Create a model from configuration dictionary"""
+        return cls(
+            config["input_size"],
+            config["hidden_layers"],
+            config["output_size"],
+            config["activation"],
+            config["weight_init"]
+        )

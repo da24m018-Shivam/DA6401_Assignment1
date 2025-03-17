@@ -1,0 +1,1 @@
+{"_runtime":1.0182322,"_step":1,"best_test_accuracy":81.67,"_timestamp":1.7415873045983942e+09,"best_model_confusion_matrix":{"path":"media/images/best_model_confusion_matrix_1_b7c48dde13754afe82a2.png","format":"png","width":1000,"height":800,"_type":"image-file","sha256":"b7c48dde13754afe82a2031cc4b3d5e665238f56635be9572ff13bbc1547a2f8","size":49787},"_wandb":{"runtime":1}}

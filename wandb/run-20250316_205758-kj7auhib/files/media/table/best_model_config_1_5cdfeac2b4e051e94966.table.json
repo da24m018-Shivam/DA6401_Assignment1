@@ -1,0 +1,1 @@
+{"columns": ["Parameter", "Value"], "data": [["input_size", "784"], ["hidden_layers", "[128, 64, 32]"], ["output_size", "10"], ["activation", "sigmoid"], ["weight_init", "xavier"]]}

@@ -1,0 +1,1 @@
+{"run_id": "peznt1sk", "sweep_id": "gk5mmfkv", "sweep_name": "gk5mmfkv", "test_accuracy": 87.6, "config": {"input_size": 784, "hidden_layers": [128, 128, 128, 128], "output_size": 10, "activation": "relu", "weight_init": "xavier"}, "dataset": "fashion_mnist"}
