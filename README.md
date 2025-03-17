@@ -1,5 +1,7 @@
 # DA6401_Assignment1
 This project implements feedforward neural networks from scratch using NumPy, with support for various activation functions, optimizers, and hyperparameter tuning capabilities.
+Github Link : https://github.com/da24m018-Shivam/DA6401_Assignment1 
+Report Link : https://wandb.ai/shivam-da24m018-iitmaana/DA6401_Assignment1/reports/DA6401_Assignment1--VmlldzoxMTgzOTk0OA
 
 ## Features
 
